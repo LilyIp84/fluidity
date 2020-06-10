@@ -425,6 +425,20 @@ Value is in local coordinates (recommended value 0.1).</a:documentation>
                         </element>
                       </choice>
                     </element>
+                    <element name="spawn_attributes">
+                      <a:documentation>Options for setting particle attributes when spawned</a:documentation>
+                      <choice>
+                        <element name="copy_parent_attributes">
+                          <a:documentation>Particles will spawn with attributes copied from the parent particle.
+Used when attributes are identical across the particle_subgroup.</a:documentation>
+                          <empty/>
+                        </element>
+                        <element name="calculate_average">
+                          <a:documentation>Particles will spawn with attributes calculated from the average of particle_attributes within the control volume.</a:documentation>
+                          <empty/>
+                        </element>
+                      </choice>
+                    </element>
                     <optional>
                       <element name="subgroup_spawning_caps">
                         <a:documentation>Option to set spawning caps for specific particle subgroups if one is dominant in a control volume.</a:documentation>

@@ -350,6 +350,18 @@ start =
 			   empty
 			}
 	             },
+		     ## Options for setting particle attributes when spawned
+		     element spawn_attributes {
+	                ## Particles will spawn with attributes copied from the parent particle.
+			## Used when attributes are identical across the particle_subgroup.
+	                element copy_parent_attributes {
+			   empty
+	                }|
+			## Particles will spawn with attributes calculated from the average of particle_attributes within the control volume.
+			element calculate_average {
+			   empty
+			}
+	             },
 		     ## Option to set spawning caps for specific particle subgroups if one is dominant in a control volume.
 		     element subgroup_spawning_caps {
 		        ## Percentage of single subgroup required to be present for only that subgroup to spawn within a specific control volume.

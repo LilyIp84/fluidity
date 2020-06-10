@@ -69,7 +69,7 @@
   </io>
   <particles>
     <particle_group name="Rhodri">
-      <velocity_field name="Velocity"/>
+      <particle_io/>
       <particle_spawning>
         <mesh name="CoordinateMesh"/>
         <min_cv_threshhold>
@@ -81,6 +81,9 @@
         <spawn_location>
           <random/>
         </spawn_location>
+        <spawn_attributes>
+          <copy_parent_attributes/>
+        </spawn_attributes>
       </particle_spawning>
       <particle_subgroup name="Thomas">
         <number_of_particles>
@@ -88,7 +91,7 @@
         </number_of_particles>
         <initial_position>
           <python>
-            <string_value lines="20" type="code" language="python">def val(t):
+            <string_value type="code" language="python" lines="20">def val(t):
   from numpy import arange,zeros,reshape,concatenate,cos,pi
   a=100
   b=100
@@ -131,12 +134,12 @@
     </finish_time>
   </timestepping>
   <material_phase name="BoussinesqFluid">
-    <vector_field name="Velocity" rank="1">
+    <vector_field rank="1" name="Velocity">
       <prescribed>
         <mesh name="VelocityMesh"/>
         <value name="WholeMesh">
           <python>
-            <string_value lines="20" type="code" language="python">def val(X,t):
+            <string_value type="code" language="python" lines="20">def val(X,t):
   x = X[0]
   y = X[1]
   return [-(y-0.5)/2.0,(x-0.5)/2.0]</string_value>
@@ -149,9 +152,12 @@
         <detectors>
           <exclude_from_detectors/>
         </detectors>
+        <particles>
+          <exclude_from_particles/>
+        </particles>
       </prescribed>
     </vector_field>
-    <scalar_field name="Nparticles" rank="0">
+    <scalar_field rank="0" name="Nparticles">
       <diagnostic>
         <algorithm name="number_of_particles" material_phase_support="multiple">
           <particle_group name="Rhodri"/>
