@@ -476,7 +476,7 @@ The return value must have length number_of_particles.
 
 *** IMPORTANT NOTE ***
 
-The t argument is for future use only - currently particle locations are only set at simulation start.</a:documentation>
+The t argument is only utilized if option initialise_during_simulation is enabled.</a:documentation>
                           <ref name="python_code"/>
                         </element>
                         <element name="from_file">
@@ -486,6 +486,11 @@ The t argument is for future use only - currently particle locations are only se
                           </attribute>
                         </element>
                       </choice>
+                      <optional>
+                        <element name="initialise_during_simulation">
+                          <empty/>
+                        </element>
+                      </optional>
                     </element>
                     <optional>
                       <element name="attributes">

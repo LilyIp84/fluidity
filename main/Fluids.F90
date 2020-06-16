@@ -745,6 +745,7 @@ contains
 
        !Call move and write particles
        call move_particles(state, dt)
+       call initialise_particles_during_simulation(state, current_time)
        call particle_cv_check(state)
        call update_particle_diagnostics(state, current_time, dt)
        call write_particles_loop(state, timestep, current_time)

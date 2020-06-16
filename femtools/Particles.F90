@@ -56,7 +56,8 @@ module particles
 
   public :: initialise_particles, move_particles, write_particles_loop, destroy_particles, &
             update_particle_attributes_and_fields, checkpoint_particles_loop, &
-	    get_particle_arrays, particle_lists, initialise_constant_particle_attributes
+	    get_particle_arrays, particle_lists, initialise_constant_particle_attributes, &
+            initialise_particles_during_simulation
 
 
   ! One particle list for each subgroup
@@ -302,7 +303,6 @@ contains
           call get_option(trim(subgroup_path) // "/number_of_particles", sub_particles)
           call get_option(trim(subgroup_path) // "/name", subname)
           particle_lists(list_counter)%total_num_det = sub_particles
-          allocate(particle_lists(list_counter)%detector_names(sub_particles))
 
           ! Register this I/O list with a global list of detectors/particles
           call register_detector_list(particle_lists(list_counter))
@@ -421,6 +421,61 @@ contains
     call deallocate(old_field_names)
   end subroutine initialise_particles
 
+  !> Initialise particles for times greater than 0
+  subroutine initialise_particles_during_simulation(state, current_time)
+    !> Model state structure
+    type(state_type), dimension(:), intent(in) :: state
+    !> Current simulation time
+    real, intent(in) :: current_time
+
+    integer :: i, k, dim, id_number
+    integer :: particle_groups, particle_subgroups, list_counter
+    integer, dimension(:), allocatable :: init_check
+
+    type(vector_field), pointer :: xfield
+    type(attr_counts_type) :: attr_counts
+    type(detector_type), pointer :: particle
+
+    character(len=FIELD_NAME_LEN) :: subname
+
+    logical :: global
+
+    ! Check whether there are any particles.
+    particle_groups = option_count("/particles/particle_group")
+    if (particle_groups == 0) return
+
+    ! Allocate parameters from the coordinate field
+    xfield => extract_vector_field(state(1), "Coordinate")
+    call get_option("/geometry/dimension", dim)
+    
+    list_counter = 1
+
+    ewrite(2,*) "In initialise_particles_during_simulation"
+
+    !Check if initialise_during_simulation is enabled
+    do i = 1, particle_groups
+       group_path = "/particles/particle_group["//int2str(i-1)//"]"
+       particle_subgroups = option_count(trim(group_path) // "/particle_subgroup")
+       do k = 1, particle_subgroups
+          subgroup_path = trim(group_path) // "/particle_subgroup["//int2str(k-1)//"]"
+          if (have_option(trim(subgroup_path)//"/initial_position/initialise_during_simulation")) then
+             particle => particle_lists(list_counter)%last
+             attr_counts%attrs = size(particle%attributes)
+             attr_counts%old_attrs = size(particle%old_attributes)
+             attr_counts%old_fields = size(particle%old_fields)
+             id_number = particle%id_number
+             call get_option(trim(subgroup_path) // "/name", subname)
+             call read_particles_from_python(subname, subgroup_path, particle_lists(list_counter), xfield, dim, &
+                  current_time, state, attr_counts, global, id_number)
+
+          end if
+          list_counter = list_counter + 1
+       end do
+    end do
+
+
+  end subroutine initialise_particles_during_simulation
+
   !> Get the names and count of all attributes and old attributes for
   !! a given attribute rank for a particle subgroup
   subroutine attr_names_and_count(key, names, old_names, dims, old_dims, to_write, count, old_count)
@@ -500,7 +555,7 @@ contains
   subroutine read_particles_from_python(n_particles, subgroup_name, subgroup_path, &
        p_list, xfield, dim, &
        current_time, state, &
-       attr_counts, global)
+       attr_counts, global, id_number)
 
     !> Number of particles in this subgroup
     integer, intent(in) :: n_particles
@@ -523,6 +578,8 @@ contains
     type(attr_counts_type), intent(in) :: attr_counts
     !> Whether to consider this particle in a global element search
     logical, intent(in), optional :: global
+    !> ID number of last particle currently in list
+    integer, optional, intent(in) :: id_number
 
     integer :: i, str_size, proc_num
     character(len=PYTHON_FUNC_LEN) :: func
@@ -541,11 +598,19 @@ contains
     str_size = len_trim(int2str(n_particles))
     fmt="(a,I"//int2str(str_size)//"."//int2str(str_size)//")"
 
-    do i = 1, n_particles
-      write(particle_name, fmt) trim(subgroup_name)//"_", i
-      call create_single_particle(p_list, xfield, coords(:,i), &
-           i, proc_num, trim(particle_name), dim, attr_counts, global=global)
-    end do
+    if (present(id_number)) then
+       do i = 1, n_particles
+          write(particle_name, fmt) trim(subgroup_name)//"_", i+id_number
+          call create_single_particle(p_list, xfield, coords(:,i), &
+               i+id_number, proc_num, trim(particle_name), dim, attr_counts, global=global)
+       end do
+    else
+       do i = 1, n_particles
+          write(particle_name, fmt) trim(subgroup_name)//"_", i
+          call create_single_particle(p_list, xfield, coords(:,i), &
+               i, proc_num, trim(particle_name), dim, attr_counts, global=global)
+       end do
+    end if
 
     deallocate(coords)
   end subroutine read_particles_from_python
@@ -831,11 +896,6 @@ contains
     shape => ele_shape(xfield,1)
     assert(xfield%dim+1==local_coord_count(shape))
 
-    if (present(particle_number)) then
-       detector_list%detector_names(particle_number) = name
-    else
-       detector_list%detector_names(id) = name
-    end if
     ! Determine element and local_coords from position
     call picker_inquire(xfield, position, element, local_coord=lcoords, global=picker_global)
     call get_option("/timestepping/timestep", dt)

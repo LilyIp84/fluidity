@@ -382,24 +382,29 @@ start =
                      (
                         ##Initial position of particles
                         element initial_position {
-                           ## Python function prescribing dimensional vector input. Functions should be of the form:
-                           ##
-                           ##  def val(t):
-                           ##     # Function code
-                           ##     return # Return value
-                           ##
-                           ## The return value must have length number_of_particles.
-                           ##
-                           ## *** IMPORTANT NOTE ***
-                           ##
-                           ## The t argument is for future use only - currently particle locations are only set at simulation start.
-                           element python {
-                              python_code
-                           }|
-                           ## File containing the particle positions in binary form
-                           element from_file {
-                              attribute file_name { xsd:string }
-                           }
+			   (
+                              ## Python function prescribing dimensional vector input. Functions should be of the form:
+                              ##
+                              ##  def val(t):
+                              ##     # Function code
+                              ##     return # Return value
+                              ##
+                              ## The return value must have length number_of_particles.
+                              ##
+                              ## *** IMPORTANT NOTE ***
+                              ##
+                              ## The t argument is only utilized if option initialise_during_simulation is enabled.
+                              element python {
+                                 python_code
+                              }|
+                              ## File containing the particle positions in binary form
+                              element from_file {
+                                 attribute file_name { xsd:string }
+                              }
+			   ),
+			   element initialise_during_simulation {
+			      empty
+			   }?
                         } 
                      ),
                      (
@@ -411,7 +416,7 @@ start =
                                  attribute name { xsd:string },
 				 ## Do not output this attribute to file
 				 element exclude_from_output {
-				     empty
+				    empty
 				 }?,
                                  generic_scalar_particle_attribute_choice
 			      }|
@@ -423,7 +428,7 @@ start =
 				 },
 				 ## Do not output this attribute to file
 				 element exclude_from_output {
-				     empty
+				    empty
 				 }?,
                                  generic_scalar_particle_attribute_choice
 			      }|
