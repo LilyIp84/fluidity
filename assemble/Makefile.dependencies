@@ -641,7 +641,7 @@ Particle_Diagnostics.o ../include/particle_diagnostics.mod: \
    ../include/global_parameters.mod ../include/halos.mod \
    ../include/multimaterial_module.mod ../include/parallel_fields.mod \
    ../include/parallel_tools.mod ../include/particles.mod \
-   ../include/pickers.mod ../include/state_module.mod
+   ../include/pickers.mod ../include/profiler.mod ../include/state_module.mod
 
 ../include/petsc_solve_state_module.mod: Petsc_Solve_State.o
 	@true
