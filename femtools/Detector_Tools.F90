@@ -725,7 +725,7 @@ contains
     !!< specified in the string func at those points. 
     real, dimension(:,:), target, intent(inout) :: values
     !! Func may contain any python at all but the following function must
-    !! be defiled:
+    !! be defined:
     !!  def val(t)
     !! where t is the time. The result must be a float. 
     character(len=*), intent(in) :: func

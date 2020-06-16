@@ -376,9 +376,9 @@ contains
                    attr_counts, attr_names, old_attr_names, old_field_names, &
                    number_of_partitions)
             else
-              call read_particles_from_python(sub_particles, subname, subgroup_path, &
+              call read_particles_from_python(subname, subgroup_path, &
                    particle_lists(list_counter), xfield, dim, &
-                   current_time, state, attr_counts, global)
+                   current_time, state, attr_counts, global, n_particles=sub_particles)
             end if
           end if
 
@@ -436,6 +436,7 @@ contains
     type(attr_counts_type) :: attr_counts
     type(detector_type), pointer :: particle
 
+    character(len=OPTION_PATH_LEN) :: group_path, subgroup_path
     character(len=FIELD_NAME_LEN) :: subname
 
     logical :: global
@@ -466,7 +467,7 @@ contains
              id_number = particle%id_number
              call get_option(trim(subgroup_path) // "/name", subname)
              call read_particles_from_python(subname, subgroup_path, particle_lists(list_counter), xfield, dim, &
-                  current_time, state, attr_counts, global, id_number)
+                  current_time, state, attr_counts, global, id_number=id_number)
 
           end if
           list_counter = list_counter + 1
@@ -552,13 +553,12 @@ contains
   end subroutine attr_names_and_count
 
   !> Initialise particles which are defined by a Python function
-  subroutine read_particles_from_python(n_particles, subgroup_name, subgroup_path, &
+  subroutine read_particles_from_python(subgroup_name, subgroup_path, &
        p_list, xfield, dim, &
        current_time, state, &
-       attr_counts, global, id_number)
+       attr_counts, global, &
+       id_number, n_particles)
 
-    !> Number of particles in this subgroup
-    integer, intent(in) :: n_particles
     !> Name of the particles' subgroup
     character(len=FIELD_NAME_LEN), intent(in) :: subgroup_name
     !> Path prefix for the subgroup in options
@@ -580,6 +580,8 @@ contains
     logical, intent(in), optional :: global
     !> ID number of last particle currently in list
     integer, optional, intent(in) :: id_number
+    !> Number of particles in this subgroup
+    integer, optional, intent(in) :: n_particles
 
     integer :: i, str_size, proc_num
     character(len=PYTHON_FUNC_LEN) :: func
@@ -592,7 +594,8 @@ contains
     ewrite(2,*) "Reading particles from options"
     call get_option(trim(subgroup_path)//"/initial_position/python", func)
     call get_option("/timestepping/timestep", dt)
-    allocate(coords(dim, n_particles))
+    if (present(n_particles)) allocate(coords(dim, n_particles))
+    
     call set_detector_coords_from_python(coords, n_particles, func, current_time)
 
     str_size = len_trim(int2str(n_particles))
