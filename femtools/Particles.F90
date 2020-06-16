@@ -28,7 +28,7 @@
 
 module particles
   use fldebug
-  use iso_c_binding, only: C_NULL_CHAR
+  use iso_c_binding, only: C_NULL_CHAR, c_ptr, c_f_pointer
   use global_parameters, only:FIELD_NAME_LEN,OPTION_PATH_LEN, &
        & PYTHON_FUNC_LEN, integer_size, real_size, is_active_process
   use futils, only: int2str, free_unit
@@ -47,6 +47,7 @@ module particles
   use detector_parallel
   use detector_move_lagrangian
   use time_period
+  use embed_python, only: set_detectors_from_python, deallocate_c_array
 
   use H5hut
 
@@ -378,7 +379,7 @@ contains
             else
               call read_particles_from_python(subname, subgroup_path, &
                    particle_lists(list_counter), xfield, dim, &
-                   current_time, state, attr_counts, global, n_particles=sub_particles)
+                   current_time, state, attr_counts, global, n_particles_in=sub_particles)
             end if
           end if
 
@@ -557,7 +558,7 @@ contains
        p_list, xfield, dim, &
        current_time, state, &
        attr_counts, global, &
-       id_number, n_particles)
+       id_number, n_particles_in)
 
     !> Name of the particles' subgroup
     character(len=FIELD_NAME_LEN), intent(in) :: subgroup_name
@@ -581,12 +582,16 @@ contains
     !> ID number of last particle currently in list
     integer, optional, intent(in) :: id_number
     !> Number of particles in this subgroup
-    integer, optional, intent(in) :: n_particles
+    integer, optional, intent(in) :: n_particles_in
 
-    integer :: i, str_size, proc_num
+    integer :: i, str_size, proc_num, n_particles, stat
     character(len=PYTHON_FUNC_LEN) :: func
     character(len=FIELD_NAME_LEN) :: fmt, particle_name
     real, allocatable, dimension(:,:) :: coords ! all particle coordinates, from python
+    ! if we don't know how many particles we're getting, we need a C pointer
+    type(c_ptr) :: coord_ptr
+    ! and a fortran pointer
+    real, pointer, dimension(:,:) :: coord_array_ptr
     real :: dt
 
     proc_num = getprocno()
@@ -594,9 +599,21 @@ contains
     ewrite(2,*) "Reading particles from options"
     call get_option(trim(subgroup_path)//"/initial_position/python", func)
     call get_option("/timestepping/timestep", dt)
-    if (present(n_particles)) allocate(coords(dim, n_particles))
-    
-    call set_detector_coords_from_python(coords, n_particles, func, current_time)
+
+    if (present(n_particles_in)) then
+      n_particles = n_particles_in
+      allocate(coords(dim, n_particles))
+      ! we are receiving an expected number of particles from python, so
+      ! use the usual routine
+      call set_detector_coords_from_python(coords, n_particles, func, current_time)
+    else
+      call set_detectors_from_python(func, len(func), dim, current_time, coord_ptr, n_particles, stat)
+
+      call c_f_pointer(coord_ptr, coord_array_ptr, [dim, n_particles])
+      coords = coord_array_ptr
+
+      call deallocate_c_array(coord_ptr)
+    end if
 
     str_size = len_trim(int2str(n_particles))
     fmt="(a,I"//int2str(str_size)//"."//int2str(str_size)//")"
