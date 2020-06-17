@@ -375,10 +375,6 @@ start =
                   ## function of from a file.
                   element particle_subgroup {
                      attribute name { xsd:string },
-                     ## The number of particles prescribed by the python function.
-                     element number_of_particles {
-                        integer
-                     },
                      (
                         ##Initial position of particles
                         element initial_position {
@@ -399,7 +395,12 @@ start =
                               }|
                               ## File containing the particle positions in binary form
                               element from_file {
-                                 attribute file_name { xsd:string }
+			         (
+				    attribute file_name { xsd:string },
+				    element number_of_particles {
+				       integer
+				    }
+				 )
                               }
 			   ),
 			   element initialise_during_simulation {

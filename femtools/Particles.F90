@@ -301,9 +301,7 @@ contains
           if (.not. do_analytical .and. .not. from_file) cycle
 
           ! Set up the particle list structure
-          call get_option(trim(subgroup_path) // "/number_of_particles", sub_particles)
           call get_option(trim(subgroup_path) // "/name", subname)
-          particle_lists(list_counter)%total_num_det = sub_particles
 
           ! Register this I/O list with a global list of detectors/particles
           call register_detector_list(particle_lists(list_counter))
@@ -372,6 +370,7 @@ contains
           if (is_active_process) then
             ! Read particles from options -- only if this process is currently active (as defined in flredecomp
             if (from_file) then
+              call get_option(trim(subgroup_path) // "/initial_position/from_file/number_of_particles", sub_particles)
               call read_particles_from_file(sub_particles, subname, subgroup_path, &
                    particle_lists(list_counter), list_counter, xfield, dim, &
                    attr_counts, attr_names, old_attr_names, old_field_names, &
@@ -379,9 +378,11 @@ contains
             else
               call read_particles_from_python(subname, subgroup_path, &
                    particle_lists(list_counter), list_counter, xfield, dim, &
-                   current_time, state, attr_counts, global, n_particles_in=sub_particles)
+                   current_time, state, attr_counts, global, sub_particles)
             end if
           end if
+
+          particle_lists(list_counter)%total_num_det = sub_particles
 
           if (do_output) then
             ! Only set up output if we need to (i.e. actually running,
@@ -430,7 +431,7 @@ contains
     real, intent(in) :: current_time
 
     integer :: i, k, j, dim, id_number
-    integer :: particle_groups, particle_subgroups, list_counter
+    integer :: particle_groups, particle_subgroups, list_counter, sub_particles
     integer, dimension(:), allocatable :: init_check
 
     type(vector_field), pointer :: xfield
@@ -504,14 +505,13 @@ contains
              else
                 attr_counts%old_fields(:) = 0
              end if
-             
-             !attr_counts%attrs = particle_lists(list_counter)%total_attributes(1)
-             !attr_counts%old_attrs = particle_lists(list_counter)%total_attributes(2)
-             !attr_counts%old_fields = particle_lists(list_counter)%total_attributes(3)
+
              id_number = particle_lists(list_counter)%proc_part_count
              call get_option(trim(subgroup_path) // "/name", subname)
              call read_particles_from_python(subname, subgroup_path, particle_lists(list_counter), list_counter, xfield, dim, &
-                  current_time, state, attr_counts, global, id_number=id_number)
+                  current_time, state, attr_counts, global, sub_particles, id_number=id_number)
+
+             particle_lists(list_counter)%total_num_det = particle_lists(list_counter)%total_num_det + sub_particles
 
           end if
           list_counter = list_counter + 1
@@ -602,7 +602,7 @@ contains
        xfield, dim, &
        current_time, state, &
        attr_counts, global, &
-       id_number, n_particles_in)
+       n_particles, id_number)
 
     !> Name of the particles' subgroup
     character(len=FIELD_NAME_LEN), intent(in) :: subgroup_name
@@ -625,12 +625,12 @@ contains
     type(attr_counts_type), intent(in) :: attr_counts
     !> Whether to consider this particle in a global element search
     logical, intent(in), optional :: global
+    !> Number of particles being initialized
+    integer, intent(out) :: n_particles
     !> ID number of last particle currently in list
     integer, optional, intent(in) :: id_number
-    !> Number of particles in this subgroup
-    integer, optional, intent(in) :: n_particles_in
 
-    integer :: i, str_size, proc_num, n_particles, stat
+    integer :: i, str_size, proc_num, stat
     character(len=PYTHON_FUNC_LEN) :: func
     character(len=FIELD_NAME_LEN) :: fmt, particle_name
     real, allocatable, dimension(:,:) :: coords ! all particle coordinates, from python
@@ -646,22 +646,21 @@ contains
     call get_option(trim(subgroup_path)//"/initial_position/python", func)
     call get_option("/timestepping/timestep", dt)
 
-    if (present(n_particles_in)) then
-      n_particles = n_particles_in
-      allocate(coords(dim, n_particles))
-      ! we are receiving an expected number of particles from python, so
-      ! use the usual routine
-      call set_detector_coords_from_python(coords, n_particles, func, current_time)
-    else
-      call set_detectors_from_python(func, len(func), dim, current_time, coord_ptr, n_particles, stat)
-      call c_f_pointer(coord_ptr, coord_array_ptr, [dim, n_particles])
-      allocate(coords(dim, n_particles))
-      if (n_particles==0) return
-      coords = coord_array_ptr
-      p_list%total_num_det = p_list%total_num_det + n_particles
+    !if (present(n_particles_in)) then
+    !  n_particles = n_particles_in
+    !  allocate(coords(dim, n_particles))
+    !  ! we are receiving an expected number of particles from python, so
+    !  ! use the usual routine
+    !  call set_detector_coords_from_python(coords, n_particles, func, current_time)
+    !else
+    call set_detectors_from_python(func, len(func), dim, current_time, coord_ptr, n_particles, stat)
+    call c_f_pointer(coord_ptr, coord_array_ptr, [dim, n_particles])
+    allocate(coords(dim, n_particles))
+    if (n_particles==0) return
+    coords = coord_array_ptr
 
-      call deallocate_c_array(coord_ptr)
-    end if
+    call deallocate_c_array(coord_ptr)
+    !end if
 
     str_size = len_trim(int2str(n_particles))
     fmt="(a,I"//int2str(str_size)//"."//int2str(str_size)//")"
@@ -2107,15 +2106,12 @@ contains
     ewrite(1,*) 'In update_particles_options'
     ewrite(1,*) temp_string
 
-    call delete_option(trim(subgroup_path_name) // trim(temp_string) // "/number_of_particles")
     call delete_option(trim(subgroup_path_name) // trim(temp_string) // "/initial_position")
-
-    call set_option(trim(subgroup_path_name) // trim(temp_string) // "/number_of_particles/", &
-         & num_particles, stat = stat)
 
     assert(any(stat == (/SPUD_NO_ERROR, SPUD_NEW_KEY_WARNING/)))
 
     call set_option_attribute(trim(subgroup_path_name) // trim(temp_string) // "/initial_position/from_file/file_name", trim(filename), stat)
+    call set_option(trim(subgroup_path_name) // trim(temp_string) // "/initial_position/from_file/number_of_particles", num_particles, stat)
 
     if(stat /= SPUD_NO_ERROR .and. stat /= SPUD_NEW_KEY_WARNING .and. stat /= SPUD_ATTR_SET_FAILED_WARNING) then
        FLAbort("Failed to set particles options filename when checkpointing particles with option path " // "/particles/particle_array::" // trim(temp_string))

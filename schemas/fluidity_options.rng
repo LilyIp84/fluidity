@@ -458,10 +458,6 @@ function of from a file.</a:documentation>
                     <attribute name="name">
                       <data type="string"/>
                     </attribute>
-                    <element name="number_of_particles">
-                      <a:documentation>The number of particles prescribed by the python function.</a:documentation>
-                      <ref name="integer"/>
-                    </element>
                     <element name="initial_position">
                       <a:documentation>Initial position of particles</a:documentation>
                       <choice>
@@ -484,6 +480,9 @@ The t argument is only utilized if option initialise_during_simulation is enable
                           <attribute name="file_name">
                             <data type="string"/>
                           </attribute>
+                          <element name="number_of_particles">
+                            <ref name="integer"/>
+                          </element>
                         </element>
                       </choice>
                       <optional>
