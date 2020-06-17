@@ -1130,6 +1130,17 @@ module particle_diagnostics
        allocate(weighted_old_fields(size(group_arrays)))
        allocate(length_group(size(group_arrays)))
        length_group(:) = 0
+       do i = 1,size(group_arrays)
+          temp_part => particle_lists(group_arrays(i))%last
+          if (associated(temp_part)) then
+             allocate(weighted_attributes(i)%col(size(temp_part%attributes)))
+             allocate(weighted_old_attributes(i)%col(size(temp_part%old_attributes)))
+             allocate(weighted_old_fields(i)%col(size(temp_part%old_fields)))
+             weighted_attributes(i)%col(:)=0
+             weighted_old_attributes(i)%col(:)=0
+             weighted_old_fields(i)%col(:)=0
+          end if
+       end do
     end if
     node_loc = node_val(xfield,node_num)
     ele_val(:,:,:) = 0
@@ -1139,14 +1150,6 @@ module particle_diagnostics
           if (node_numbers(j,k)==node_num) cycle
           do i = 1,size(group_arrays)
              temp_part => node_particles(i,node_numbers(j,k))%first
-             if (copy_parents.eqv..false.) then
-                allocate(weighted_attributes(i)%col(size(temp_part%attributes)))
-                allocate(weighted_old_attributes(i)%col(size(temp_part%old_attributes)))
-                allocate(weighted_old_fields(i)%col(size(temp_part%old_fields)))
-                weighted_attributes(i)%col(:)=0
-                weighted_old_attributes(i)%col(:)=0
-                weighted_old_fields(i)%col(:)=0
-             end if
              allocate(distance(node_particles(i,node_numbers(j,k))%length))
              distance(:)=0
              do l = 1,node_particles(i,node_numbers(j,k))%length
