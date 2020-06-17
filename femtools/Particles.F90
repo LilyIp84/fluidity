@@ -2108,10 +2108,8 @@ contains
 
     call delete_option(trim(subgroup_path_name) // trim(temp_string) // "/initial_position")
 
-    assert(any(stat == (/SPUD_NO_ERROR, SPUD_NEW_KEY_WARNING/)))
-
     call set_option_attribute(trim(subgroup_path_name) // trim(temp_string) // "/initial_position/from_file/file_name", trim(filename), stat)
-    call set_option(trim(subgroup_path_name) // trim(temp_string) // "/initial_position/from_file/number_of_particles", num_particles, stat)
+    call set_option(trim(subgroup_path_name) // trim(temp_string) // "/initial_position/from_file/number_of_particles", num_particles, stat = stat)
 
     if(stat /= SPUD_NO_ERROR .and. stat /= SPUD_NEW_KEY_WARNING .and. stat /= SPUD_ATTR_SET_FAILED_WARNING) then
        FLAbort("Failed to set particles options filename when checkpointing particles with option path " // "/particles/particle_array::" // trim(temp_string))
