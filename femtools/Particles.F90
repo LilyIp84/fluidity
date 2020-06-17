@@ -373,12 +373,12 @@ contains
             ! Read particles from options -- only if this process is currently active (as defined in flredecomp
             if (from_file) then
               call read_particles_from_file(sub_particles, subname, subgroup_path, &
-                   particle_lists(list_counter), xfield, dim, &
+                   particle_lists(list_counter), list_counter, xfield, dim, &
                    attr_counts, attr_names, old_attr_names, old_field_names, &
                    number_of_partitions)
             else
               call read_particles_from_python(subname, subgroup_path, &
-                   particle_lists(list_counter), xfield, dim, &
+                   particle_lists(list_counter), list_counter, xfield, dim, &
                    current_time, state, attr_counts, global, n_particles_in=sub_particles)
             end if
           end if
@@ -429,22 +429,38 @@ contains
     !> Current simulation time
     real, intent(in) :: current_time
 
-    integer :: i, k, dim, id_number
+    integer :: i, k, j, dim, id_number
     integer :: particle_groups, particle_subgroups, list_counter
     integer, dimension(:), allocatable :: init_check
 
     type(vector_field), pointer :: xfield
     type(attr_counts_type) :: attr_counts
+    type(attr_names_type) :: attr_names, old_attr_names, field_names, old_field_names
+    type(attr_write_type) :: attr_write
     type(detector_type), pointer :: particle
+    integer, dimension(3) :: field_counts, old_field_counts
 
     character(len=OPTION_PATH_LEN) :: group_path, subgroup_path
     character(len=FIELD_NAME_LEN) :: subname
 
-    logical :: global
+    character(len=*), dimension(3), parameter :: orders = ["scalar", "vector", "tensor"]
+    character(len=*), dimension(3), parameter :: types = ["prescribed", "diagnostic", "prognostic"]
+
+    logical :: global, store_old_fields
 
     ! Check whether there are any particles.
     particle_groups = option_count("/particles/particle_group")
     if (particle_groups == 0) return
+
+    ! calculate the number of fields and old fields that would have to be stored
+    ! (each combination of field order and field type)
+    old_field_counts(:) = 0
+    do i = 1, 3
+      do j = 1, 3
+        old_field_counts(i) = old_field_counts(i) + &
+             option_count("/material_phase/"//orders(i)//"_field/"//types(j)//"/particles/include_in_particles/store_old_field")
+      end do
+    end do
 
     ! Allocate parameters from the coordinate field
     xfield => extract_vector_field(state(1), "Coordinate")
@@ -461,13 +477,40 @@ contains
        do k = 1, particle_subgroups
           subgroup_path = trim(group_path) // "/particle_subgroup["//int2str(k-1)//"]"
           if (have_option(trim(subgroup_path)//"/initial_position/initialise_during_simulation")) then
-             particle => particle_lists(list_counter)%last
-             attr_counts%attrs = size(particle%attributes)
-             attr_counts%old_attrs = size(particle%old_attributes)
-             attr_counts%old_fields = size(particle%old_fields)
-             id_number = particle%id_number
+             ! Find number of attributes, old attributes, and names of each
+             call attr_names_and_count(trim(subgroup_path) // "/attributes/scalar_attribute", &
+               attr_names%s, old_attr_names%s, attr_names%sn, old_attr_names%sn, attr_write%s, &
+               attr_counts%attrs(1), attr_counts%old_attrs(1))
+             call attr_names_and_count(trim(subgroup_path) // "/attributes/vector_attribute", &
+               attr_names%v, old_attr_names%v, attr_names%vn, old_attr_names%vn, attr_write%v, &
+               attr_counts%attrs(2), attr_counts%old_attrs(2))
+             call attr_names_and_count(trim(subgroup_path) // "/attributes/tensor_attribute", &
+               attr_names%t, old_attr_names%t, attr_names%tn, old_attr_names%tn, attr_write%t, &
+               attr_counts%attrs(3), attr_counts%old_attrs(3))
+
+             ! If any attributes are from fields, we'll need to store old fields too
+             store_old_fields = .false.
+             if (option_count(trim(subgroup_path) // "/attributes/scalar_attribute/python_fields") > 0 .or. &
+                  option_count(trim(subgroup_path) // "/attributes/scalar_attribute_array/python_fields") > 0 .or. &
+                  option_count(trim(subgroup_path) // "/attributes/vector_attribute/python_fields") > 0 .or. &
+                  option_count(trim(subgroup_path) // "/attributes/vector_attribute_array/python_fields") > 0 .or. &
+                  option_count(trim(subgroup_path) // "/attributes/tensor_attribute/python_fields") > 0 .or. &
+                  option_count(trim(subgroup_path) // "/attributes/tensor_attribute_array/python_fields") > 0) then
+                store_old_fields = .true.
+             end if
+
+             if (store_old_fields) then
+                attr_counts%old_fields(:) = old_field_counts(:)
+             else
+                attr_counts%old_fields(:) = 0
+             end if
+             
+             !attr_counts%attrs = particle_lists(list_counter)%total_attributes(1)
+             !attr_counts%old_attrs = particle_lists(list_counter)%total_attributes(2)
+             !attr_counts%old_fields = particle_lists(list_counter)%total_attributes(3)
+             id_number = particle_lists(list_counter)%proc_part_count
              call get_option(trim(subgroup_path) // "/name", subname)
-             call read_particles_from_python(subname, subgroup_path, particle_lists(list_counter), xfield, dim, &
+             call read_particles_from_python(subname, subgroup_path, particle_lists(list_counter), list_counter, xfield, dim, &
                   current_time, state, attr_counts, global, id_number=id_number)
 
           end if
@@ -555,7 +598,8 @@ contains
 
   !> Initialise particles which are defined by a Python function
   subroutine read_particles_from_python(subgroup_name, subgroup_path, &
-       p_list, xfield, dim, &
+       p_list, list_id, &
+       xfield, dim, &
        current_time, state, &
        attr_counts, global, &
        id_number, n_particles_in)
@@ -566,6 +610,8 @@ contains
     character(len=OPTION_PATH_LEN), intent(in) :: subgroup_path
     !> Detector list to hold the particles
     type(detector_linked_list), intent(inout) :: p_list
+    !> List ID of particle list
+    integer :: list_id
     !> Coordinate vector field
     type(vector_field), pointer, intent(in) :: xfield
     !> Geometry dimension
@@ -608,9 +654,11 @@ contains
       call set_detector_coords_from_python(coords, n_particles, func, current_time)
     else
       call set_detectors_from_python(func, len(func), dim, current_time, coord_ptr, n_particles, stat)
-
       call c_f_pointer(coord_ptr, coord_array_ptr, [dim, n_particles])
+      allocate(coords(dim, n_particles))
+      if (n_particles==0) return
       coords = coord_array_ptr
+      p_list%total_num_det = p_list%total_num_det + n_particles
 
       call deallocate_c_array(coord_ptr)
     end if
@@ -621,13 +669,13 @@ contains
     if (present(id_number)) then
        do i = 1, n_particles
           write(particle_name, fmt) trim(subgroup_name)//"_", i+id_number
-          call create_single_particle(p_list, xfield, coords(:,i), &
+          call create_single_particle(p_list, list_id, xfield, coords(:,i), &
                i+id_number, proc_num, trim(particle_name), dim, attr_counts, global=global)
        end do
     else
        do i = 1, n_particles
           write(particle_name, fmt) trim(subgroup_name)//"_", i
-          call create_single_particle(p_list, xfield, coords(:,i), &
+          call create_single_particle(p_list, list_id, xfield, coords(:,i), &
                i, proc_num, trim(particle_name), dim, attr_counts, global=global)
        end do
     end if
@@ -726,7 +774,7 @@ contains
 
   !> Read particles in the given subgroup from a checkpoint file
   subroutine read_particles_from_file(n_particles, subgroup_name, subgroup_path, &
-       p_list, xfield, dim, &
+       p_list, list_id, xfield, dim, &
        attr_counts, attr_names, old_attr_names, old_field_names, &
        n_partitions)
     !> Number of particles in this subgroup
@@ -737,6 +785,8 @@ contains
     character(len=OPTION_PATH_LEN), intent(in) :: subgroup_path
     !> Detector list to hold the particles
     type(detector_linked_list), intent(inout) :: p_list
+    !> List ID of particle list
+    integer :: list_id
     !> Coordinate vector field
     type(vector_field), pointer, intent(in) :: xfield
     !> Geometry dimension
@@ -836,7 +886,7 @@ contains
       call read_attrs(h5_id, dim, attr_counts%old_fields, old_field_names, old_field_vals, prefix="old%")
 
       ! don't use a global check for this particle
-      call create_single_particle(p_list, xfield, &
+      call create_single_particle(p_list, list_id, xfield, &
            positions, id(1), proc_id(1), trim(particle_name), dim, &
            attr_counts, attr_vals, old_attr_vals, old_field_vals, global=.false., particle_number=particle_number)
       particle_number = particle_number + 1
@@ -875,10 +925,12 @@ contains
 
   !> Allocate a single particle, populate and insert it into the given list
   !! In parallel, first check if the particle would be local and only allocate if it is
-  subroutine create_single_particle(detector_list, xfield, position, id, proc_id, name, dim, &
+  subroutine create_single_particle(detector_list, list_id, xfield, position, id, proc_id, name, dim, &
        attr_counts, attr_vals, old_attr_vals, old_field_vals, global, particle_number)
     !> The detector list to hold the particle
     type(detector_linked_list), intent(inout) :: detector_list
+    !> List ID of particle list
+    integer :: list_id
     !> Coordinate vector field
     type(vector_field), pointer, intent(in) :: xfield
     !> Spatial position of the particle
@@ -945,6 +997,7 @@ contains
     detector%local_coords = lcoords
     detector%id_number = id
     detector%proc_id = proc_id
+    detector%list_id = list_id
     detector_list%proc_part_count = detector_list%proc_part_count + 1
 
     ! allocate space to store all attributes on the particle
