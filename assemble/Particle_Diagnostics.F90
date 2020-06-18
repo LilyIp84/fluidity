@@ -719,7 +719,6 @@ module particle_diagnostics
     summed_particles(:) = 0
     temp_part_count(:) = 0
 
-
     !Loop over all nodes
     do i = 1,node_count(mesh)
        !Count number of particles per node and ensure thresholds are not broken
@@ -773,7 +772,7 @@ module particle_diagnostics
        call allsum(summed_particles(j))
        particle_lists(group_arrays(j))%total_num_det=particle_lists(group_arrays(j))%total_num_det+summed_particles(j)
     end do
-
+    
     !Sanity check
     do j=1,size(group_arrays)
        total_particles = particle_lists(group_arrays(j))%length
@@ -787,7 +786,6 @@ module particle_diagnostics
     deallocate(summed_particles)
     deallocate(temp_part_count)
 
-
     do i=1,node_count(mesh)
        do j=1,size(group_arrays)
           del_node_particles => node_particles(j,i)
@@ -795,7 +793,6 @@ module particle_diagnostics
        end do
     end do
     deallocate(node_particles)
-
 
   end subroutine spawn_delete_particles
 
@@ -914,23 +911,27 @@ module particle_diagnostics
        end if
        if (copy_parents.eqv..false.) then
           particle => node_particles(j)%first
-          allocate(weighted_attributes(size(particle%attributes)))
-          allocate(weighted_old_attributes(size(particle%old_attributes)))
-          allocate(weighted_old_fields(size(particle%old_fields)))
-          weighted_attributes(:) = 0
-          weighted_old_attributes(:) = 0
-          weighted_old_fields(:) = 0
+          if (associated(particle)) then
+             allocate(weighted_attributes(size(particle%attributes)))
+             allocate(weighted_old_attributes(size(particle%old_attributes)))
+             allocate(weighted_old_fields(size(particle%old_fields)))
+             weighted_attributes(:) = 0
+             weighted_old_attributes(:) = 0
+             weighted_old_fields(:) = 0
+          end if
           do while(associated(particle))
              weighted_attributes = weighted_attributes + particle%attributes
              weighted_old_attributes = weighted_old_attributes + particle%old_attributes
              weighted_old_fields = weighted_old_fields + particle%old_fields
              particle => particle%temp_next
           end do
-          weighted_attributes = weighted_attributes/node_particles(j)%length
-          weighted_old_attributes = weighted_old_attributes/node_particles(j)%length
-          weighted_old_fields = weighted_old_fields/node_particles(j)%length
+          if (allocated(weighted_attributes)) then
+             weighted_attributes = weighted_attributes/node_particles(j)%length
+             weighted_old_attributes = weighted_old_attributes/node_particles(j)%length
+             weighted_old_fields = weighted_old_fields/node_particles(j)%length
+          end if
        end if
-          
+       
        temp_part => particle_lists(group_arrays(j))%last
        if (associated(temp_part)) then
 
