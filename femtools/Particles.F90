@@ -30,12 +30,13 @@ module particles
   use fldebug
   use iso_c_binding, only: C_NULL_CHAR, c_ptr, c_f_pointer
   use global_parameters, only:FIELD_NAME_LEN,OPTION_PATH_LEN, &
-       & PYTHON_FUNC_LEN, integer_size, real_size, is_active_process
+& PYTHON_FUNC_LEN, integer_size, real_size, is_active_process
   use futils, only: int2str, free_unit
   use elements
   use mpi_interfaces
   use parallel_tools
   use spud
+  use embed_python, only: set_detectors_from_python, deallocate_c_array
   use parallel_fields
   use fields
   use profiler
@@ -47,9 +48,7 @@ module particles
   use detector_parallel
   use detector_move_lagrangian
   use time_period
-  use embed_python, only: set_detectors_from_python, deallocate_c_array
-
-  use H5hut
+  use h5hut
 
   implicit none
 

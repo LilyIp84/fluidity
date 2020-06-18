@@ -30,7 +30,7 @@
 module diagnostic_variables
   !!< A module to calculate and output diagnostics. This replaces the .s file.
   use iso_c_binding, only: c_long
-  use fldebug 
+  use fldebug
   use global_parameters, only:FIELD_NAME_LEN,OPTION_PATH_LEN, &
 & PYTHON_FUNC_LEN, integer_size, real_size
   use quadrature
@@ -78,10 +78,9 @@ module diagnostic_variables
   use mixing_statistics
   use detector_tools
   use detector_parallel
+  use h5hut
   use particles, only: get_particle_arrays
   use state_fields_module
-
-  use H5hut
 
   implicit none
 
