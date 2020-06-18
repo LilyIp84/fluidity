@@ -88,14 +88,19 @@
         </max_cv_threshhold>
         <spawn_location>
           <radius>
-            <real_value rank="0">0.1</real_value>
+            <real_value rank="0">0.3</real_value>
           </radius>
         </spawn_location>
+        <spawn_attributes>
+          <copy_parent_attributes/>
+        </spawn_attributes>
+        <subgroup_spawning_caps>
+          <percentage>
+            <real_value rank="0">99.9</real_value>
+          </percentage>
+        </subgroup_spawning_caps>
       </particle_spawning>
       <particle_subgroup name="Dense">
-        <number_of_particles>
-          <integer_value rank="0">11458</integer_value>
-        </number_of_particles>
         <initial_position>
           <python>
             <string_value type="code" language="python" lines="20">def val(t):
@@ -127,9 +132,6 @@
         </attributes>
       </particle_subgroup>
       <particle_subgroup name="Buoyant">
-        <number_of_particles>
-          <integer_value rank="0">2942</integer_value>
-        </number_of_particles>
         <initial_position>
           <python>
             <string_value type="code" language="python" lines="20">def val(t):
@@ -488,6 +490,9 @@
         <detectors>
           <exclude_from_detectors/>
         </detectors>
+        <particles>
+          <exclude_from_particles/>
+        </particles>
         <steady_state>
           <include_in_steady_state/>
         </steady_state>
