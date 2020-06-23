@@ -86,9 +86,6 @@
         </spawn_attributes>
       </particle_spawning>
       <particle_subgroup name="Thomas">
-        <number_of_particles>
-          <integer_value rank="0">10000</integer_value>
-        </number_of_particles>
         <initial_position>
           <python>
             <string_value type="code" language="python" lines="20">def val(t):
