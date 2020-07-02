@@ -63,7 +63,14 @@
     x = 0.25+0.5*arange(0,11.)/11.
     y = zeros(11) + 0.5
     a = reshape(concatenate((x,y)),(2,11)).T
-  elif (t&gt;0.15 and t&lt;0.25):
+  return a</string_value>
+          </python>
+        </initial_position>
+        <initialise_during_simulation>
+          <python>
+            <string_value type="code" language="python" lines="20">def val(t):
+  from numpy import arange,zeros,reshape,concatenate
+  if (t&gt;0.15 and t&lt;0.25):
     x = 0.25+0.5*arange(0,11.)/11.
     y = 0.25+0.5*arange(0,11.)/11.
     a = reshape(concatenate((x,y)),(2,11)).T
@@ -75,8 +82,7 @@
     a = zeros([0,0])
   return a</string_value>
           </python>
-          <initialise_during_simulation/>
-        </initial_position>
+        </initialise_during_simulation>
         <attributes>
           <scalar_attribute name="Chem1">
             <python_fields>

@@ -442,6 +442,7 @@ contains
 
     character(len=OPTION_PATH_LEN) :: group_path, subgroup_path
     character(len=FIELD_NAME_LEN) :: subname
+    character(len=PYTHON_FUNC_LEN) :: script
 
     character(len=*), dimension(3), parameter :: orders = ["scalar", "vector", "tensor"]
     character(len=*), dimension(3), parameter :: types = ["prescribed", "diagnostic", "prognostic"]
@@ -476,7 +477,7 @@ contains
        particle_subgroups = option_count(trim(group_path) // "/particle_subgroup")
        do k = 1, particle_subgroups
           subgroup_path = trim(group_path) // "/particle_subgroup["//int2str(k-1)//"]"
-          if (have_option(trim(subgroup_path)//"/initial_position/initialise_during_simulation")) then
+          if (have_option(trim(subgroup_path)//"/initialise_during_simulation")) then
              ! Find number of attributes, old attributes, and names of each
              call attr_names_and_count(trim(subgroup_path) // "/attributes/scalar_attribute", &
                attr_names%s, old_attr_names%s, attr_names%sn, old_attr_names%sn, attr_write%s, &
@@ -505,10 +506,12 @@ contains
                 attr_counts%old_fields(:) = 0
              end if
 
+             call get_option(trim(subgroup_path)//"/initialise_during_simulation/python", script)
+
              id_number = particle_lists(list_counter)%proc_part_count
              call get_option(trim(subgroup_path) // "/name", subname)
              call read_particles_from_python(subname, subgroup_path, particle_lists(list_counter), list_counter, xfield, dim, &
-                  current_time, state, attr_counts, global, sub_particles, id_number=id_number)
+                  current_time, state, attr_counts, global, sub_particles, id_number=id_number, script=script)
 
              particle_lists(list_counter)%total_num_det = particle_lists(list_counter)%total_num_det + sub_particles
 
@@ -601,7 +604,7 @@ contains
        xfield, dim, &
        current_time, state, &
        attr_counts, global, &
-       n_particles, id_number)
+       n_particles, id_number, script)
 
     !> Name of the particles' subgroup
     character(len=FIELD_NAME_LEN), intent(in) :: subgroup_name
@@ -628,6 +631,8 @@ contains
     integer, intent(out) :: n_particles
     !> ID number of last particle currently in list
     integer, optional, intent(in) :: id_number
+    !> Python script used by initialise_during_simulation
+    character(len=PYTHON_FUNC_LEN), optional, intent(in) :: script
 
     integer :: i, str_size, proc_num, stat
     character(len=PYTHON_FUNC_LEN) :: func
@@ -642,7 +647,12 @@ contains
     proc_num = getprocno()
 
     ewrite(2,*) "Reading particles from options"
-    call get_option(trim(subgroup_path)//"/initial_position/python", func)
+
+    if (present(script)) then
+       func=script
+    else
+       call get_option(trim(subgroup_path)//"/initial_position/python", func)
+    end if
     call get_option("/timestepping/timestep", dt)
 
     !if (present(n_particles_in)) then

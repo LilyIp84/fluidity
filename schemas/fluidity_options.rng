@@ -458,11 +458,12 @@ function of from a file.</a:documentation>
                     <attribute name="name">
                       <data type="string"/>
                     </attribute>
-                    <element name="initial_position">
-                      <a:documentation>Initial position of particles</a:documentation>
-                      <choice>
-                        <element name="python">
-                          <a:documentation>Python function prescribing dimensional vector input. Functions should be of the form:
+                    <group>
+                      <element name="initial_position">
+                        <a:documentation>Initial position of particles</a:documentation>
+                        <choice>
+                          <element name="python">
+                            <a:documentation>Python function prescribing dimensional vector input. Functions should be of the form:
 
  def val(t):
     # Function code
@@ -472,25 +473,39 @@ The return value must have length number_of_particles.
 
 *** IMPORTANT NOTE ***
 
-The t argument is only utilized if option initialise_during_simulation is enabled.</a:documentation>
-                          <ref name="python_code"/>
-                        </element>
-                        <element name="from_file">
-                          <a:documentation>File containing the particle positions in binary form</a:documentation>
-                          <attribute name="file_name">
-                            <data type="string"/>
-                          </attribute>
-                          <element name="number_of_particles">
-                            <ref name="integer"/>
+The t argument is not used here. To spawn with t dependence use initialise_during_simulation option below.</a:documentation>
+                            <ref name="python_code"/>
                           </element>
-                        </element>
-                      </choice>
+                          <element name="from_file">
+                            <a:documentation>File containing the particle positions in binary form</a:documentation>
+                            <attribute name="file_name">
+                              <data type="string"/>
+                            </attribute>
+                            <element name="number_of_particles">
+                              <ref name="integer"/>
+                            </element>
+                          </element>
+                        </choice>
+                      </element>
                       <optional>
                         <element name="initialise_during_simulation">
-                          <empty/>
+                          <element name="python">
+                            <a:documentation>Python function prescribing dimensional vector input. Functions should be of the form:
+
+ def val(t):
+    # Function code
+    return # Return value
+
+The return value must have length number_of_particles.
+
+*** IMPORTANT NOTE ***
+
+This function will only be called after simulation start. To initialise starting positions use initial_position option above.</a:documentation>
+                            <ref name="python_code"/>
+                          </element>
                         </element>
                       </optional>
-                    </element>
+                    </group>
                     <optional>
                       <element name="attributes">
                         <a:documentation>Define particle attributes.</a:documentation>

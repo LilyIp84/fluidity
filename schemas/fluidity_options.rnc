@@ -389,7 +389,7 @@ start =
                               ##
                               ## *** IMPORTANT NOTE ***
                               ##
-                              ## The t argument is only utilized if option initialise_during_simulation is enabled.
+                              ## The t argument is not used here. To spawn with t dependence use initialise_during_simulation option below.
                               element python {
                                  python_code
                               }|
@@ -402,11 +402,24 @@ start =
 				    }
 				 )
                               }
-			   ),
-			   element initialise_during_simulation {
-			      empty
-			   }?
-                        } 
+			   )
+			},
+			element initialise_during_simulation {
+			   ## Python function prescribing dimensional vector input. Functions should be of the form:
+                           ##
+                           ##  def val(t):
+                           ##     # Function code
+                           ##     return # Return value
+                           ##
+                           ## The return value must have length number_of_particles.
+                           ##
+                           ## *** IMPORTANT NOTE ***
+                           ##
+                           ## This function will only be called after simulation start. To initialise starting positions use initial_position option above.
+                           element python {
+                              python_code
+			   }
+			}?
                      ),
                      (
                         ##Define particle attributes.
