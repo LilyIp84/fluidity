@@ -367,7 +367,7 @@ contains
           end if
 
           if (is_active_process) then
-            ! Read particles from options -- only if this process is currently active (as defined in flredecomp
+            ! Read particles from options -- only if this process is currently active (as defined in flredecomp)
             if (from_file) then
               call get_option(trim(subgroup_path) // "/initial_position/from_file/number_of_particles", sub_particles)
               call read_particles_from_file(sub_particles, subname, subgroup_path, &
@@ -429,7 +429,7 @@ contains
     !> Current simulation time
     real, intent(in) :: current_time
 
-    integer :: i, k, j, dim, id_number
+    integer :: i, k, j, dim
     integer :: particle_groups, particle_subgroups, list_counter, sub_particles
     integer, dimension(:), allocatable :: init_check
 
@@ -508,10 +508,9 @@ contains
 
              call get_option(trim(subgroup_path)//"/initialise_during_simulation/python", script)
 
-             id_number = particle_lists(list_counter)%proc_part_count
              call get_option(trim(subgroup_path) // "/name", subname)
              call read_particles_from_python(subname, subgroup_path, particle_lists(list_counter), list_counter, xfield, dim, &
-                  current_time, state, attr_counts, global, sub_particles, id_number=id_number, script=script)
+                  current_time, state, attr_counts, global, sub_particles, script=script)
 
              particle_lists(list_counter)%total_num_det = particle_lists(list_counter)%total_num_det + sub_particles
 
@@ -604,7 +603,7 @@ contains
        xfield, dim, &
        current_time, state, &
        attr_counts, global, &
-       n_particles, id_number, script)
+       n_particles, script)
 
     !> Name of the particles' subgroup
     character(len=FIELD_NAME_LEN), intent(in) :: subgroup_name
@@ -629,8 +628,6 @@ contains
     logical, intent(in), optional :: global
     !> Number of particles being initialized
     integer, intent(out) :: n_particles
-    !> ID number of last particle currently in list
-    integer, optional, intent(in) :: id_number
     !> Python script used by initialise_during_simulation
     character(len=PYTHON_FUNC_LEN), optional, intent(in) :: script
 
@@ -655,13 +652,6 @@ contains
     end if
     call get_option("/timestepping/timestep", dt)
 
-    !if (present(n_particles_in)) then
-    !  n_particles = n_particles_in
-    !  allocate(coords(dim, n_particles))
-    !  ! we are receiving an expected number of particles from python, so
-    !  ! use the usual routine
-    !  call set_detector_coords_from_python(coords, n_particles, func, current_time)
-    !else
     call set_detectors_from_python(func, len(func), dim, current_time, coord_ptr, n_particles, stat)
     call c_f_pointer(coord_ptr, coord_array_ptr, [dim, n_particles])
     allocate(coords(dim, n_particles))
@@ -669,24 +659,15 @@ contains
     coords = coord_array_ptr
 
     call deallocate_c_array(coord_ptr)
-    !end if
 
     str_size = len_trim(int2str(n_particles))
     fmt="(a,I"//int2str(str_size)//"."//int2str(str_size)//")"
 
-    if (present(id_number)) then
-       do i = 1, n_particles
-          write(particle_name, fmt) trim(subgroup_name)//"_", i+id_number
-          call create_single_particle(p_list, list_id, xfield, coords(:,i), &
-               i+id_number, proc_num, trim(particle_name), dim, attr_counts, global=global)
-       end do
-    else
-       do i = 1, n_particles
-          write(particle_name, fmt) trim(subgroup_name)//"_", i
-          call create_single_particle(p_list, list_id, xfield, coords(:,i), &
-               i, proc_num, trim(particle_name), dim, attr_counts, global=global)
-       end do
-    end if
+    do i = 1, n_particles
+       write(particle_name, fmt) trim(subgroup_name)//"_", p_list%proc_part_count + 1
+       call create_single_particle(p_list, list_id, xfield, coords(:,i), &
+            proc_num, trim(particle_name), dim, attr_counts, global=global)
+    end do
 
     deallocate(coords)
   end subroutine read_particles_from_python
@@ -895,8 +876,8 @@ contains
 
       ! don't use a global check for this particle
       call create_single_particle(p_list, list_id, xfield, &
-           positions, id(1), proc_id(1), trim(particle_name), dim, &
-           attr_counts, attr_vals, old_attr_vals, old_field_vals, global=.false., particle_number=particle_number)
+           positions, proc_id(1), trim(particle_name), dim, attr_counts, id(1), &
+           attr_vals, old_attr_vals, old_field_vals, global=.false., particle_number=particle_number)
       particle_number = particle_number + 1
     end do
 
@@ -933,8 +914,8 @@ contains
 
   !> Allocate a single particle, populate and insert it into the given list
   !! In parallel, first check if the particle would be local and only allocate if it is
-  subroutine create_single_particle(detector_list, list_id, xfield, position, id, proc_id, name, dim, &
-       attr_counts, attr_vals, old_attr_vals, old_field_vals, global, particle_number)
+  subroutine create_single_particle(detector_list, list_id, xfield, position, proc_id, name, dim, &
+       attr_counts, id, attr_vals, old_attr_vals, old_field_vals, global, particle_number)
     !> The detector list to hold the particle
     type(detector_linked_list), intent(inout) :: detector_list
     !> List ID of particle list
@@ -943,8 +924,6 @@ contains
     type(vector_field), pointer, intent(in) :: xfield
     !> Spatial position of the particle
     real, dimension(xfield%dim), intent(in) :: position
-    !> Unique ID number for this particle
-    integer, intent(in) :: id
     !> Procces ID on which this particle was created
     integer, intent(in) :: proc_id
     !> The particle's name
@@ -954,6 +933,8 @@ contains
     !> Counts of scalar, vector and tensor attributes, old attributes
     !! and old fields to store on the particle
     type(attr_counts_type), intent(in) :: attr_counts
+    !> Unique ID number for this particle
+    integer, intent(in), optional :: id
     !> If provided, initialise the particle's attributes directly
     type(attr_vals_type), intent(in), optional :: attr_vals, old_attr_vals, old_field_vals
     !> Whether to create this particle in a collective operation (true)
@@ -1003,7 +984,11 @@ contains
     detector%position = position
     detector%element = element
     detector%local_coords = lcoords
-    detector%id_number = id
+    if (present(id)) then
+       detector%id_number = id
+    else
+       detector%id_number = detector_list%proc_part_count + 1
+    end if
     detector%proc_id = proc_id
     detector%list_id = list_id
     detector_list%proc_part_count = detector_list%proc_part_count + 1
@@ -1746,7 +1731,7 @@ contains
     allocate(attrib_data(detector_list%length, tot_atts))
     allocate(node_ids(detector_list%length))
     allocate(proc_ids(detector_list%length))
-    
+
     node => detector_list%first
     position_loop: do i = 1, detector_list%length
       assert(size(node%position) == dim)
@@ -1756,7 +1741,7 @@ contains
       attrib_data(i,:) = node%attributes(:)
       node_ids(i) = node%id_number
       proc_ids(i) = node%proc_id
-      
+
       node => node%next
     end do position_loop
 
@@ -1774,7 +1759,7 @@ contains
 
     h5_ierror = h5pt_writedata_i4(detector_list%h5_id, "id", node_ids(:))
     h5_ierror = h5pt_writedata_i4(detector_list%h5_id, "proc_id", proc_ids(:))
-    
+
     call write_attrs(detector_list%h5_id, dim, detector_list%attr_names, attrib_data, to_write=detector_list%attr_write)
 
     h5_ierror = h5_flushstep(detector_list%h5_id)
